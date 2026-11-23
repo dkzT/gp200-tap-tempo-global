@@ -1,0 +1,37 @@
+tamanho original: 6452728  modificado: 6452728  iguais: True
+bytes diferentes: 11
+todas as diferencas estao na lista do patch: True
+bytes identicos fora do patch: 6452717
+checksum (soma 8 bits de 0x30..fim) original 0xcd / byte 0x0E 0xcd
+checksum (soma 8 bits de 0x30..fim) modific. 0x87 / byte 0x0E 0x87
+SHA-256 original  : c368618773097b07c556c951eb10792f9d57be929323366648eb6e083d0d23af
+SHA-256 modificado: 2c60f211b2ab76d57f385205b5674bd44dac41b133d8550b1a4e8711c882ff8e
+
+offset   original  -> novo
+0x00000e  cd  -> 87
+0x008866  a8  -> 00
+0x008867  b1  -> bf
+0x00a556  f0  -> 00
+0x00a557  b1  -> bf
+0x00a95e  d8  -> 00
+0x00a95f  b1  -> bf
+0x00a962  6c  -> 22
+0x00a963  02  -> 01
+0x00a966  22  -> 6c
+0x00a967  01  -> 02
+
+0x0a556 (end. 0xa4de): set_tempo: sempre copiar o tap para o BPM global (cbz -> nop)
+    antes : cbz r0, #0xa51e
+    depois: nop 
+0x08866 (end. 0x87ee): set_global_bpm: sempre aplicar o BPM global ao tempo atual (cbz -> nop)
+    antes : cbz r0, #0x881c
+    depois: nop 
+0x0a95e (end. 0xa8e6): select_patch: sempre aplicar o BPM global na troca de preset (cbz -> nop)
+    antes : cbz r0, #0xa920
+    depois: nop 
+0x0a960 (end. 0xa8e8): select_patch: ldrh r0,[r4,#0x26c] -> ldrh r0,[r4,#0x122] (le o global)
+    antes : ldrh.w r0, [r4, #0x26c]
+    depois: ldrh.w r0, [r4, #0x122]
+0x0a964 (end. 0xa8ec): select_patch: strh r0,[r4,#0x122] -> strh r0,[r4,#0x26c] (grava no preset atual)
+    antes : strh.w r0, [r4, #0x122]
+    depois: strh.w r0, [r4, #0x26c]

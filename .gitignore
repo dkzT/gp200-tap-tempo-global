@@ -1,0 +1,9 @@
+# Firmware e binários da Valeton não são distribuídos
+*.bin
+*.exe
+*.gif
+original/
+work/
+__pycache__/
+*.pkl
+dist/
