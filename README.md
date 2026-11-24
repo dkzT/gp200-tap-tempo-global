@@ -51,7 +51,7 @@ O **TapGlobalPatcher.exe** (Windows, sem instalação) aplica o patch no firmwar
    - aplica o patch, recalcula o checksum e compara o resultado byte a byte com o original;
    - só salva se o SHA-256 do resultado for exatamente `2c60f211b2ab76d57f385205b5674bd44dac41b133d8550b1a4e8711c882ff8e`;
    - nunca sobrescreve o arquivo original.
-4. **Faça backup dos seus presets** pelo app GP-200 (a atualização apaga todos).
+4. **Faça backup dos seus presets** pelo app GP-200 (apenas por precaução).
 5. Grave pelo app oficial: Settings > Firmware Update > selecione o `_TAPGLOBAL.bin` > Update Now.
 
 Também funciona pela linha de comando: `TapGlobalPatcher.exe <oficial.bin> <saida.bin>`.
