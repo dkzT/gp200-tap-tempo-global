@@ -19,16 +19,16 @@ namespace TapGlobal
                 StringBuilder log = new StringBuilder();
                 try
                 {
-                    if (Path.GetFullPath(args[0]) == Path.GetFullPath(args[1])) throw new Exception("A saída deve ser outro arquivo.");
+                    if (Path.GetFullPath(args[0]) == Path.GetFullPath(args[1])) throw new Exception(L.T("A saída deve ser outro arquivo.", "The output must be a different file."));
                     byte[] patched = Patcher.Apply(File.ReadAllBytes(args[0]), log);
                     File.WriteAllBytes(args[1], patched);
-                    log.AppendLine("Gerado: " + args[1]);
+                    log.AppendLine(L.T("Gerado: ", "Generated: ") + args[1]);
                     MessageBox.Show(log.ToString(), "Tap Tempo Global", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return 0;
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(log.ToString() + "ERRO: " + ex.Message, "Tap Tempo Global", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(log.ToString() + L.T("ERRO: ", "ERROR: ") + ex.Message, "Tap Tempo Global", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 1;
                 }
             }

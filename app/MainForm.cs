@@ -111,7 +111,7 @@ namespace TapGlobal
             using (SolidBrush b = new SolidBrush(Color.FromArgb(30, 64, 156, 255))) { g.FillPath(b, p); }
             TextRenderer.DrawText(g, pill, pf, Rectangle.Round(pr), Theme.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             TextRenderer.DrawText(g, "Tap Tempo Global", Theme.Semi(24f), new Point(22, 48), Theme.Text);
-            TextRenderer.DrawText(g, "Bata o tempo uma vez. Troque de preset sem perder o BPM.", Theme.F(10.5f), new Point(27, 94), Theme.Muted);
+            TextRenderer.DrawText(g, L.T("Bata o tempo uma vez. Troque de preset sem perder o BPM.", "Tap the tempo once. Switch presets without losing the BPM."), Theme.F(10.5f), new Point(27, 94), Theme.Muted);
 
             // LED de tap
             float cx = Width - 70, cy = 66;
@@ -137,7 +137,7 @@ namespace TapGlobal
     class Steps : Canvas
     {
         public int Current = 0; // 0..2 ; 3 = tudo pronto
-        static readonly string[] Labels = { "Firmware oficial", "Gerar arquivo", "Gravar na pedaleira" };
+        static string[] Labels { get { return L.En ? new string[] { "Official firmware", "Generate file", "Flash the pedal" } : new string[] { "Firmware oficial", "Gerar arquivo", "Gravar na pedaleira" }; } }
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.Clear(Theme.Bg);
@@ -213,8 +213,8 @@ namespace TapGlobal
             string t = Title, d = Detail;
             if (State == DropState.Empty)
             {
-                t = IsDragOver ? "Solte o arquivo aqui" : "Arraste o firmware oficial para cá";
-                d = "ou clique para procurar  •  GP-200_USB_Firmware_" + Patcher.FirmwareVersion + ".bin";
+                t = IsDragOver ? L.T("Solte o arquivo aqui", "Drop the file here") : L.T("Arraste o firmware oficial para cá", "Drag the official firmware here");
+                d = L.T("ou clique para procurar  •  GP-200_USB_Firmware_", "or click to browse  •  GP-200_USB_Firmware_") + Patcher.FirmwareVersion + ".bin";
             }
             Rectangle tr = new Rectangle(110, (int)cy - 26, Width - 130, 26);
             Rectangle dr = new Rectangle(110, (int)cy + 2, Width - 130, 40);
@@ -254,7 +254,7 @@ namespace TapGlobal
             TextBox t = new TextBox(); t.Multiline = true; t.ReadOnly = true; t.ScrollBars = ScrollBars.Vertical; t.BorderStyle = BorderStyle.None;
             t.BackColor = Theme.Panel; t.ForeColor = Theme.Text; t.Font = mono ? new Font("Consolas", 9.5f) : Theme.F(10.5f);
             t.Text = body.Replace("\r\n", "\n").Replace("\n", "\r\n"); t.SetBounds(24, 60, 576, 352); t.SelectionStart = 0; Controls.Add(t);
-            FlatButton ok = new FlatButton(); ok.Text = "Fechar"; ok.SetBounds(480, 424, 120, 38); ok.Click += delegate { Close(); }; Controls.Add(ok);
+            FlatButton ok = new FlatButton(); ok.Text = L.T("Fechar", "Close"); ok.SetBounds(480, 424, 120, 38); ok.Click += delegate { Close(); }; Controls.Add(ok);
             MainForm.DarkTitle(this);
         }
     }
@@ -263,9 +263,10 @@ namespace TapGlobal
     {
         Header header; Steps steps; DropZone drop; Label lblOut; LinkLabel lnkChangeOut;
         FlatButton btnGo, btnOpenFolder, btnDetails; ResultCard result;
-        Timer pulseTimer; float pulseT; DateTime lastTap = DateTime.MinValue;
+        Timer pulseTimer; float pulseT;
 
         string inputPath, outputPath, lastLog = "";
+        bool lastResultOk;
         byte[] inputData;
 
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int val, int size);
@@ -285,38 +286,56 @@ namespace TapGlobal
             DoubleBuffered = true;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
             DarkTitle(this);
+            AllowDrop = true; DragEnter += OnDragEnter; DragDrop += OnDragDrop;
+            BuildUi();
+            pulseTimer = new Timer(); pulseTimer.Interval = 30; pulseTimer.Tick += OnPulse; pulseTimer.Start();
+        }
+
+        // Monta (ou remonta, ao trocar de idioma) todos os controles
+        void BuildUi()
+        {
+            SuspendLayout();
+            while (Controls.Count > 0) { Control c = Controls[0]; Controls.RemoveAt(0); c.Dispose(); }
 
             header = new Header(); header.SetBounds(0, 0, 760, 128); Controls.Add(header);
-            header.Click += delegate { lastTap = DateTime.Now; };
             steps = new Steps(); steps.SetBounds(0, 132, 760, 52); Controls.Add(steps);
 
             drop = new DropZone(); drop.SetBounds(28, 196, 704, 120); Controls.Add(drop);
             drop.Click += delegate { Browse(); };
             drop.DragEnter += OnDragEnter; drop.DragLeave += delegate { drop.IsDragOver = false; drop.Invalidate(); }; drop.DragDrop += OnDragDrop;
-            AllowDrop = true; DragEnter += OnDragEnter; DragDrop += OnDragDrop;
 
-            Label outCap = new Label(); outCap.Text = "SALVAR EM"; outCap.Font = Theme.Semi(8f); outCap.ForeColor = Theme.Dim; outCap.SetBounds(30, 330, 120, 18); Controls.Add(outCap);
+            Label outCap = new Label(); outCap.Text = L.T("SALVAR EM", "SAVE TO"); outCap.Font = Theme.Semi(8f); outCap.ForeColor = Theme.Dim; outCap.SetBounds(30, 330, 120, 18); Controls.Add(outCap);
             lblOut = new Label(); lblOut.Text = "—"; lblOut.AutoEllipsis = true; lblOut.ForeColor = Theme.Muted; lblOut.SetBounds(30, 350, 600, 20); Controls.Add(lblOut);
-            lnkChangeOut = MakeLink("alterar", 650, 350); lnkChangeOut.TextAlign = ContentAlignment.TopRight; lnkChangeOut.Width = 80; lnkChangeOut.Visible = false;
+            lnkChangeOut = MakeLink(L.T("alterar", "change"), 650, 350); lnkChangeOut.AutoSize = false; lnkChangeOut.TextAlign = ContentAlignment.TopRight; lnkChangeOut.SetBounds(632, 350, 100, 20); lnkChangeOut.Visible = false;
             lnkChangeOut.Click += delegate { ChooseOutput(); };
 
-            btnGo = new FlatButton(); btnGo.Text = "Gerar firmware com Tap Tempo Global"; btnGo.SetBounds(28, 384, 704, 48); btnGo.Enabled = false; btnGo.Click += delegate { Generate(); }; Controls.Add(btnGo);
+            btnGo = new FlatButton(); btnGo.Text = L.T("Gerar firmware com Tap Tempo Global", "Generate firmware with Global Tap Tempo"); btnGo.SetBounds(28, 384, 704, 48); btnGo.Enabled = false; btnGo.Click += delegate { Generate(); }; Controls.Add(btnGo);
 
             result = new ResultCard(); result.SetBounds(28, 446, 704, 92); result.Visible = false; Controls.Add(result);
-            btnOpenFolder = new FlatButton(); btnOpenFolder.Primary = false; btnOpenFolder.Surface = Theme.OkBg; btnOpenFolder.Text = "Abrir pasta"; btnOpenFolder.Font = Theme.Semi(9f);
+            btnOpenFolder = new FlatButton(); btnOpenFolder.Primary = false; btnOpenFolder.Surface = Theme.OkBg; btnOpenFolder.Text = L.T("Abrir pasta", "Open folder"); btnOpenFolder.Font = Theme.Semi(9f);
             btnOpenFolder.SetBounds(462, 26, 112, 34); btnOpenFolder.Click += delegate { OpenFolder(); }; result.Controls.Add(btnOpenFolder);
-            btnDetails = new FlatButton(); btnDetails.Primary = false; btnDetails.Surface = Theme.OkBg; btnDetails.Text = "Detalhes"; btnDetails.Font = Theme.Semi(9f);
-            btnDetails.SetBounds(582, 26, 100, 34); btnDetails.Click += delegate { new InfoDialog("Relatório da verificação", lastLog, true).ShowDialog(this); }; result.Controls.Add(btnDetails);
+            btnDetails = new FlatButton(); btnDetails.Primary = false; btnDetails.Surface = Theme.OkBg; btnDetails.Text = L.T("Detalhes", "Details"); btnDetails.Font = Theme.Semi(9f);
+            btnDetails.SetBounds(582, 26, 100, 34); btnDetails.Click += delegate { new InfoDialog(L.T("Relatório da verificação", "Verification report"), lastLog, true).ShowDialog(this); }; result.Controls.Add(btnDetails);
 
             // rodapé
             Panel sep = new Panel(); sep.BackColor = Theme.Border; sep.SetBounds(28, 560, 704, 1); Controls.Add(sep);
-            LinkLabel l1 = MakeLink("Como gravar na pedaleira", 28, 574); l1.Click += delegate { ShowHelpFlash(); };
-            LinkLabel l2 = MakeLink("Voltar ao firmware oficial", 210, 574); l2.Click += delegate { ShowHelpRestore(); };
-            LinkLabel l3 = MakeLink("O que muda?", 400, 574); l3.Click += delegate { ShowHelpWhat(); };
-            Label disc = new Label(); disc.Text = "Projeto independente, sem vínculo com a Valeton. Use por sua conta e risco.  •  v" + Patcher.Version;
+            LinkLabel l1 = MakeLink(L.T("Como gravar na pedaleira", "How to flash the pedal"), 28, 574); l1.Click += delegate { ShowHelpFlash(); };
+            LinkLabel l2 = MakeLink(L.T("Voltar ao firmware oficial", "Back to the official firmware"), l1.Right + 22, 574); l2.Click += delegate { ShowHelpRestore(); };
+            LinkLabel l3 = MakeLink(L.T("O que muda?", "What changes?"), l2.Right + 22, 574); l3.Click += delegate { ShowHelpWhat(); };
+            LinkLabel lang = MakeLink(L.En ? "PT  Português" : "EN  English", 0, 574);
+            lang.Left = 732 - lang.Width; lang.Click += delegate { L.En = !L.En; BuildUi(); };
+            Label disc = new Label(); disc.Text = L.T("Projeto independente, sem vínculo com a Valeton. Use por sua conta e risco.  •  v", "Independent project, not affiliated with Valeton. Use at your own risk.  •  v") + Patcher.Version;
             disc.ForeColor = Theme.Dim; disc.Font = Theme.F(8.5f); disc.SetBounds(28, 604, 704, 18); Controls.Add(disc);
+            ResumeLayout();
 
-            pulseTimer = new Timer(); pulseTimer.Interval = 30; pulseTimer.Tick += OnPulse; pulseTimer.Start();
+            // restaura o estado depois de trocar de idioma
+            if (inputPath != null)
+            {
+                string keepOut = outputPath; bool hadResult = lastResultOk;
+                LoadInput(inputPath);
+                if (keepOut != null && inputData != null) { outputPath = keepOut; lblOut.Text = outputPath; }
+                if (hadResult && inputData != null && File.Exists(outputPath)) { ShowSuccess(); lastResultOk = true; }
+            }
         }
 
         LinkLabel MakeLink(string text, int x, int y)
@@ -350,7 +369,7 @@ namespace TapGlobal
 
         void Browse()
         {
-            OpenFileDialog d = new OpenFileDialog(); d.Filter = "Firmware GP-200 (*.bin)|*.bin|Todos os arquivos|*.*"; d.Title = "Selecione o firmware oficial GP-200 " + Patcher.FirmwareVersion;
+            OpenFileDialog d = new OpenFileDialog(); d.Filter = "Firmware GP-200 (*.bin)|*.bin|" + L.T("Todos os arquivos", "All files") + "|*.*"; d.Title = L.T("Selecione o firmware oficial GP-200 ", "Select the official GP-200 firmware ") + Patcher.FirmwareVersion;
             string dl = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
             if (Directory.Exists(dl)) d.InitialDirectory = dl;
             if (d.ShowDialog(this) == DialogResult.OK) LoadInput(d.FileName);
@@ -358,29 +377,29 @@ namespace TapGlobal
 
         void LoadInput(string path)
         {
-            result.Visible = false; inputData = null; inputPath = path;
+            result.Visible = false; inputData = null; inputPath = path; lastResultOk = false;
             try
             {
                 FileInfo fi = new FileInfo(path);
-                if (fi.Length > 64L * 1024 * 1024) throw new Exception("Arquivo grande demais para ser um firmware da GP-200.");
+                if (fi.Length > 64L * 1024 * 1024) throw new Exception(L.T("Arquivo grande demais para ser um firmware da GP-200.", "File too large to be a GP-200 firmware."));
                 byte[] d = File.ReadAllBytes(path);
                 string sha;
                 FirmwareKind k = Patcher.Identify(d, out sha);
                 if (k == FirmwareKind.Official)
                 {
                     inputData = d;
-                    SetDrop(DropState.Official, "Firmware oficial " + Patcher.FirmwareVersion + " verificado", Path.GetFileName(path) + "\nSHA-256 " + sha.Substring(0, 16) + "…  confere com o arquivo da Valeton");
+                    SetDrop(DropState.Official, L.T("Firmware oficial ", "Official firmware ") + Patcher.FirmwareVersion + L.T(" verificado", " verified"), Path.GetFileName(path) + "\nSHA-256 " + sha.Substring(0, 16) + L.T("…  confere com o arquivo da Valeton", "…  matches the Valeton file"));
                     outputPath = Path.Combine(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path) + "_TAPGLOBAL.bin");
                     lblOut.Text = outputPath; lnkChangeOut.Visible = true; btnGo.Enabled = true; steps.Current = 1;
                 }
                 else if (k == FirmwareKind.AlreadyPatched)
-                    Fail(DropState.AlreadyPatched, "Este arquivo já tem o Tap Tempo Global", Path.GetFileName(path) + "\nPode gravar direto na pedaleira. Para gerar de novo, use o firmware oficial.");
+                    Fail(DropState.AlreadyPatched, L.T("Este arquivo já tem o Tap Tempo Global", "This file already has Global Tap Tempo"), Path.GetFileName(path) + L.T("\nPode gravar direto na pedaleira. Para gerar de novo, use o firmware oficial.", "\nYou can flash it directly. To generate it again, use the official firmware."));
                 else if (k == FirmwareKind.WrongSize)
-                    Fail(DropState.Error, "Não é o firmware oficial GP-200 " + Patcher.FirmwareVersion, Path.GetFileName(path) + "  •  tamanho " + d.Length.ToString("N0") + " bytes (esperado " + Patcher.ExpectedSize.ToString("N0") + ")");
+                    Fail(DropState.Error, L.T("Não é o firmware oficial GP-200 ", "Not the official GP-200 firmware ") + Patcher.FirmwareVersion, Path.GetFileName(path) + L.T("  •  tamanho ", "  •  size ") + d.Length.ToString("N0") + L.T(" bytes (esperado ", " bytes (expected ") + Patcher.ExpectedSize.ToString("N0") + ")");
                 else
-                    Fail(DropState.Error, "Firmware diferente do oficial " + Patcher.FirmwareVersion, Path.GetFileName(path) + "\nO SHA-256 não confere. Baixe novamente o arquivo no site da Valeton.");
+                    Fail(DropState.Error, L.T("Firmware diferente do oficial ", "Firmware differs from official ") + Patcher.FirmwareVersion, Path.GetFileName(path) + L.T("\nO SHA-256 não confere. Baixe novamente o arquivo no site da Valeton.", "\nThe SHA-256 does not match. Download the file again from the Valeton website."));
             }
-            catch (Exception ex) { Fail(DropState.Error, "Não foi possível ler o arquivo", ex.Message); }
+            catch (Exception ex) { Fail(DropState.Error, L.T("Não foi possível ler o arquivo", "Could not read the file"), ex.Message); }
         }
 
         void SetDrop(DropState st, string title, string detail) { drop.State = st; drop.Title = title; drop.Detail = detail; drop.Invalidate(); steps.Invalidate(); }
@@ -405,26 +424,32 @@ namespace TapGlobal
             try
             {
                 if (Path.GetFullPath(outputPath).Equals(Path.GetFullPath(inputPath), StringComparison.OrdinalIgnoreCase))
-                    throw new Exception("Escolha outro nome: o firmware original não deve ser sobrescrito.");
+                    throw new Exception(L.T("Escolha outro nome: o firmware original não deve ser sobrescrito.", "Choose another name: the original firmware must not be overwritten."));
                 Cursor = Cursors.WaitCursor;
                 byte[] patched = Patcher.Apply(inputData, log);
                 File.WriteAllBytes(outputPath, patched);
                 // relê do disco para confirmar o que foi gravado
                 string sha; if (Patcher.Identify(File.ReadAllBytes(outputPath), out sha) != FirmwareKind.AlreadyPatched)
-                    throw new Exception("O arquivo salvo não confere. Tente salvar em outra pasta.");
-                log.AppendLine(); log.AppendLine("Arquivo gerado: " + outputPath);
+                    throw new Exception(L.T("O arquivo salvo não confere. Tente salvar em outra pasta.", "The saved file does not match. Try saving to another folder."));
+                log.AppendLine(); log.AppendLine(L.T("Arquivo gerado: ", "File generated: ") + outputPath);
                 lastLog = log.ToString();
-                result.Success = true; result.Title = "Pronto! Firmware gerado e verificado";
-                result.Detail = Path.GetFileName(outputPath) + "\n11 bytes alterados  •  SHA-256 confere com a versão testada";
-                btnOpenFolder.Visible = true; btnDetails.Visible = true; btnDetails.Surface = Theme.OkBg; steps.Current = 2;
+                ShowSuccess(); lastResultOk = true;
             }
             catch (Exception ex)
             {
-                log.AppendLine("ERRO: " + ex.Message); lastLog = log.ToString();
-                result.Success = false; result.Title = "Não foi possível gerar o arquivo"; result.Detail = ex.Message;
+                log.AppendLine(L.T("ERRO: ", "ERROR: ") + ex.Message); lastLog = log.ToString();
+                lastResultOk = false; result.Success = false; result.Title = L.T("Não foi possível gerar o arquivo", "Could not generate the file"); result.Detail = ex.Message;
                 btnOpenFolder.Visible = false; btnDetails.Visible = true; btnDetails.Surface = Theme.ErrBg;
             }
             finally { Cursor = Cursors.Default; }
+            result.Visible = true; result.Invalidate(); steps.Invalidate();
+        }
+
+        void ShowSuccess()
+        {
+            result.Success = true; result.Title = L.T("Pronto! Firmware gerado e verificado", "Done! Firmware generated and verified");
+            result.Detail = Path.GetFileName(outputPath) + L.T("\n11 bytes alterados  •  SHA-256 confere com a versão testada", "\n11 bytes changed  •  SHA-256 matches the tested version");
+            btnOpenFolder.Visible = true; btnDetails.Visible = true; btnDetails.Surface = Theme.OkBg; steps.Current = 2;
             result.Visible = true; result.Invalidate(); steps.Invalidate();
         }
 
@@ -435,19 +460,26 @@ namespace TapGlobal
 
         void ShowHelpFlash()
         {
-            new InfoDialog("Como gravar na pedaleira",
+            new InfoDialog(L.T("Como gravar na pedaleira", "How to flash the pedal"), L.T(
                 "1. Faça backup dos seus presets no app GP-200 (Patch List > exportar). A atualização apaga todos os presets do usuário.\n\n" +
                 "2. Conecte a GP-200 ao computador pelo USB e abra o app GP-200.\n\n" +
                 "3. Clique na chave inglesa (Settings) > Firmware Update.\n\n" +
                 "4. Selecione o arquivo gerado (_TAPGLOBAL.bin) e clique em Update Now.\n\n" +
                 "5. Aguarde até o fim. Não desligue a pedaleira nem o cabo durante a atualização.\n\n" +
                 "6. Restaure seus presets pelo app, se necessário.\n\n" +
-                "Dica: para o delay seguir o tempo, deixe o parâmetro Sync ligado no preset.", false).ShowDialog(this);
+                "Dica: para o delay seguir o tempo, deixe o parâmetro Sync ligado no preset.",
+                "1. Back up your presets in the GP-200 app (Patch List > export). Updating erases all user presets.\n\n" +
+                "2. Connect the GP-200 to the computer via USB and open the GP-200 app.\n\n" +
+                "3. Click the wrench icon (Settings) > Firmware Update.\n\n" +
+                "4. Select the generated file (_TAPGLOBAL.bin) and click Update Now.\n\n" +
+                "5. Wait until it finishes. Do not turn off the pedal or unplug the cable during the update.\n\n" +
+                "6. Restore your presets in the app if needed.\n\n" +
+                "Tip: for the delay to follow the tempo, keep the Sync parameter on in the preset."), false).ShowDialog(this);
         }
 
         void ShowHelpRestore()
         {
-            new InfoDialog("Voltar ao firmware oficial",
+            new InfoDialog(L.T("Voltar ao firmware oficial", "Back to the official firmware"), L.T(
                 "A gravação do firmware é feita por um modo de atualização próprio da pedaleira, que não é alterado por este patch.\n\n" +
                 "Para entrar nele manualmente (mesmo que o firmware não inicie):\n\n" +
                 "1. Desligue a fonte e deixe o cabo USB ligado ao computador.\n" +
@@ -455,24 +487,33 @@ namespace TapGlobal
                 "3. Ainda segurando, ligue a fonte e aperte o botão liga/desliga.\n" +
                 "4. Aparece a tela \"Firmware Update/Restore\".\n" +
                 "5. No app GP-200, vá em Settings > Firmware Update e grave o .bin OFICIAL.\n\n" +
-                "Para sair do modo sem gravar nada, basta reiniciar a pedaleira.", false).ShowDialog(this);
+                "Para sair do modo sem gravar nada, basta reiniciar a pedaleira.",
+                "Firmware flashing is done by the pedal's own update mode, which this patch does not change.\n\n" +
+                "To enter it manually (even if the firmware does not boot):\n\n" +
+                "1. Unplug the power supply and keep the USB cable connected to the computer.\n" +
+                "2. Hold footswitches 2 and 3 (\"+\" and \"CTRL\") and the Para knob.\n" +
+                "3. While holding them, plug in the power supply and press the power switch.\n" +
+                "4. The \"Firmware Update/Restore\" screen appears.\n" +
+                "5. In the GP-200 app, go to Settings > Firmware Update and flash the OFFICIAL .bin.\n\n" +
+                "To leave this mode without flashing anything, just restart the pedal."), false).ShowDialog(this);
         }
 
         void ShowHelpWhat()
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("No firmware original, o BPM fica salvo dentro de cada preset. Ao trocar de preset, o tempo que você bateu se perde.");
+            sb.AppendLine(L.T("No firmware original, o BPM fica salvo dentro de cada preset. Ao trocar de preset, o tempo que você bateu se perde.",
+                              "In the original firmware, the BPM is stored inside each preset. When you switch presets, the tempo you tapped is lost."));
             sb.AppendLine();
-            sb.AppendLine("Com o Tap Tempo Global:");
-            sb.AppendLine("•  O tap atualiza o BPM global, que vale para todos os presets.");
-            sb.AppendLine("•  Ao trocar de preset, o tempo atual é mantido.");
-            sb.AppendLine("•  O tempo continua valendo depois de desligar e ligar.");
-            sb.AppendLine("•  O BPM em Global Settings controla o tempo de todos os presets.");
-            sb.AppendLine("•  O preset não fica marcado como editado na troca.");
+            sb.AppendLine(L.T("Com o Tap Tempo Global:", "With Global Tap Tempo:"));
+            sb.AppendLine(L.T("•  O tap atualiza o BPM global, que vale para todos os presets.", "•  Tapping updates the global BPM, which applies to all presets."));
+            sb.AppendLine(L.T("•  Ao trocar de preset, o tempo atual é mantido.", "•  Switching presets keeps the current tempo."));
+            sb.AppendLine(L.T("•  O tempo continua valendo depois de desligar e ligar.", "•  The tempo is kept after turning the pedal off and on."));
+            sb.AppendLine(L.T("•  O BPM em Global Settings controla o tempo de todos os presets.", "•  The BPM in Global Settings controls the tempo of all presets."));
+            sb.AppendLine(L.T("•  O preset não fica marcado como editado na troca.", "•  The preset is not marked as edited when switching."));
             sb.AppendLine();
-            sb.AppendLine("São 11 bytes alterados no firmware (10 de código + o checksum):");
+            sb.AppendLine(L.T("São 11 bytes alterados no firmware (10 de código + o checksum):", "11 bytes are changed in the firmware (10 of code + the checksum):"));
             foreach (PatchEntry e in Patcher.Entries) sb.AppendLine(string.Format("   0x{0:X5}  {1}", e.Offset, e.Description));
-            new InfoDialog("O que muda?", sb.ToString(), false).ShowDialog(this);
+            new InfoDialog(L.T("O que muda?", "What changes?"), sb.ToString(), false).ShowDialog(this);
         }
     }
 }

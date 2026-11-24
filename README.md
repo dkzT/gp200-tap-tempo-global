@@ -6,6 +6,20 @@ Pesquisa de engenharia reversa (análise estática) e um patch de **11 bytes** q
 > **Aviso:** projeto independente, sem vínculo com a Valeton. Modificar firmware pode afetar a garantia. Use por sua conta e risco.
 > Este repositório **não contém** o firmware da Valeton nem binários modificados. O aplicativo e o script aplicam o patch no arquivo oficial que você baixa do site da Valeton.
 
+## English summary
+
+**Global Tap Tempo for the Valeton GP-200 (firmware V1.8.2).** On the stock firmware, the BPM is stored inside each preset, so the tempo you tap is lost whenever you switch presets. This project is the result of static reverse engineering of the firmware. It adds an **11-byte patch** that makes tap tempo **global**: tap once and switch presets freely. The tempo is also kept after a power cycle. Tested on real hardware.
+
+- **Download:** `TapGlobalPatcher.exe` from the [Releases](https://github.com/dkzT/gp200-tap-tempo-global/releases) page. It needs no installation, and the interface is available in English and Portuguese.
+- **Use:** download the official GP-200 V1.8.2 firmware from Valeton, drag the `.bin` into the app and click **Generate**. Back up your presets first, then flash the generated file with the official GP-200 app (Settings > Firmware Update).
+- **Safety:** the app only accepts the official file (SHA-256 checked) and verifies the result byte by byte. No Valeton firmware is distributed here. The executable is built by GitHub Actions from this source, with a SHA-256 checksum and a build provenance attestation. It is **not code-signed**, so Windows SmartScreen may warn about it. See the verification steps below.
+- **Recovery:** hold footswitches 2 and 3 plus the Para knob while powering on to enter the pedal's own *Firmware Update/Restore* mode, then flash the official firmware.
+- The delay follows the tempo only when its **Sync** parameter is on.
+
+Independent project, not affiliated with Valeton. Use at your own risk. Licensed under MIT.
+
+---
+
 ## O problema
 
 No firmware original, o BPM fica salvo **dentro de cada preset**. Se você bate 100 BPM no preset 2A, vai para o 1A e volta, o 2A volta ao BPM gravado nele (por exemplo, 80).

@@ -8,9 +8,10 @@ namespace TapGlobal
 {
     public class PatchEntry
     {
-        public int Offset; public byte[] Original; public byte[] Patched; public string Description;
-        public PatchEntry(int off, string orig, string patched, string desc)
-        { Offset = off; Original = Hex(orig); Patched = Hex(patched); Description = desc; }
+        public int Offset; public byte[] Original; public byte[] Patched; string descPt, descEn;
+        public string Description { get { return L.T(descPt, descEn); } }
+        public PatchEntry(int off, string orig, string patched, string pt, string en)
+        { Offset = off; Original = Hex(orig); Patched = Hex(patched); descPt = pt; descEn = en; }
         public static byte[] Hex(string s)
         {
             s = s.Replace(" ", "");
@@ -20,11 +21,18 @@ namespace TapGlobal
         }
     }
 
+    // Idioma da interface: português se o Windows estiver em português, senão inglês
+    public static class L
+    {
+        public static bool En = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "pt";
+        public static string T(string pt, string en) { return En ? en : pt; }
+    }
+
     public enum FirmwareKind { Official, AlreadyPatched, WrongSize, Unknown }
 
     public static class Patcher
     {
-        public const string Version = "1.1.0";
+        public const string Version = "1.2.0";
         public const string FirmwareVersion = "V1.8.2";
         public const long ExpectedSize = 6452728;
         public const string OriginalSha256 = "c368618773097b07c556c951eb10792f9d57be929323366648eb6e083d0d23af";
@@ -33,11 +41,11 @@ namespace TapGlobal
         public const int ChecksumStart = 0x30;
 
         public static readonly PatchEntry[] Entries = new PatchEntry[] {
-            new PatchEntry(0xA556, "f0b1",     "00bf",     "set_tempo: o tap sempre atualiza o BPM global"),
-            new PatchEntry(0x8866, "a8b1",     "00bf",     "set_global_bpm: o knob de BPM global sempre muda o tempo atual"),
-            new PatchEntry(0xA95E, "d8b1",     "00bf",     "select_patch: a troca de preset sempre aplica o BPM global"),
-            new PatchEntry(0xA960, "b4f86c02", "b4f82201", "select_patch: lê o BPM global (+0x122)"),
-            new PatchEntry(0xA964, "a4f82201", "a4f86c02", "select_patch: grava no BPM do preset atual (+0x26C)"),
+            new PatchEntry(0xA556, "f0b1",     "00bf",     "set_tempo: o tap sempre atualiza o BPM global", "set_tempo: tapping always updates the global BPM"),
+            new PatchEntry(0x8866, "a8b1",     "00bf",     "set_global_bpm: o knob de BPM global sempre muda o tempo atual", "set_global_bpm: the global BPM knob always changes the current tempo"),
+            new PatchEntry(0xA95E, "d8b1",     "00bf",     "select_patch: a troca de preset sempre aplica o BPM global", "select_patch: switching presets always applies the global BPM"),
+            new PatchEntry(0xA960, "b4f86c02", "b4f82201", "select_patch: lê o BPM global (+0x122)", "select_patch: reads the global BPM (+0x122)"),
+            new PatchEntry(0xA964, "a4f82201", "a4f86c02", "select_patch: grava no BPM do preset atual (+0x26C)", "select_patch: writes it to the current preset BPM (+0x26C)"),
         };
 
         public static string Sha256Hex(byte[] data)
@@ -73,30 +81,30 @@ namespace TapGlobal
             string sha;
             FirmwareKind k = Identify(orig, out sha);
             if (k == FirmwareKind.WrongSize)
-                throw new Exception("Tamanho inesperado (" + orig.Length + " bytes). Use o firmware oficial GP-200 " + FirmwareVersion + ".");
+                throw new Exception(L.T("Tamanho inesperado (", "Unexpected size (") + orig.Length + L.T(" bytes). Use o firmware oficial GP-200 ", " bytes). Use the official GP-200 firmware ") + FirmwareVersion + ".");
             if (k == FirmwareKind.AlreadyPatched)
-                throw new Exception("Este arquivo já está com o Tap Tempo Global. Nada a fazer.");
+                throw new Exception(L.T("Este arquivo já está com o Tap Tempo Global. Nada a fazer.", "This file already has Global Tap Tempo. Nothing to do."));
             if (k != FirmwareKind.Official)
-                throw new Exception("Este não é o firmware oficial GP-200 " + FirmwareVersion + " (SHA-256 não confere). Baixe novamente no site da Valeton.");
+                throw new Exception(L.T("Este não é o firmware oficial GP-200 ", "This is not the official GP-200 firmware ") + FirmwareVersion + L.T(" (SHA-256 não confere). Baixe novamente no site da Valeton.", " (SHA-256 does not match). Download it again from the Valeton website."));
             if (Encoding.ASCII.GetString(orig, 0, 4) != "FRMW")
-                throw new Exception("Cabeçalho FRMW ausente.");
+                throw new Exception(L.T("Cabeçalho FRMW ausente.", "FRMW header missing."));
             if (Checksum(orig) != orig[ChecksumOffset])
-                throw new Exception("Checksum do original não confere.");
-            log.AppendLine("Original OK: GP-200 " + FirmwareVersion + ", SHA-256 " + sha);
+                throw new Exception(L.T("Checksum do original não confere.", "Original checksum does not match."));
+            log.AppendLine(L.T("Original OK: GP-200 ", "Original OK: GP-200 ") + FirmwareVersion + ", SHA-256 " + sha);
 
             byte[] d = (byte[])orig.Clone();
             foreach (PatchEntry e in Entries)
             {
                 for (int i = 0; i < e.Original.Length; i++)
                     if (d[e.Offset + i] != e.Original[i])
-                        throw new Exception(string.Format("Byte inesperado em 0x{0:X}.", e.Offset + i));
+                        throw new Exception(string.Format(L.T("Byte inesperado em 0x{0:X}.", "Unexpected byte at 0x{0:X}."), e.Offset + i));
                 Array.Copy(e.Patched, 0, d, e.Offset, e.Patched.Length);
             }
             d[ChecksumOffset] = Checksum(d);
 
             int diffs = 0;
             log.AppendLine();
-            log.AppendLine("Bytes alterados (offset: original -> novo):");
+            log.AppendLine(L.T("Bytes alterados (offset: original -> novo):", "Changed bytes (offset: original -> new):"));
             for (int i = 0; i < d.Length; i++)
             {
                 if (d[i] != orig[i])
@@ -106,16 +114,16 @@ namespace TapGlobal
                     bool allowed = (i == ChecksumOffset);
                     foreach (PatchEntry e in Entries)
                         if (i >= e.Offset && i < e.Offset + e.Patched.Length) allowed = true;
-                    if (!allowed) throw new Exception(string.Format("Diferença fora do patch em 0x{0:X} (abortado).", i));
+                    if (!allowed) throw new Exception(string.Format(L.T("Diferença fora do patch em 0x{0:X} (abortado).", "Difference outside the patch at 0x{0:X} (aborted)."), i));
                 }
             }
             string newSha = Sha256Hex(d);
             if (newSha != PatchedSha256)
-                throw new Exception("SHA-256 do resultado inesperado: " + newSha);
+                throw new Exception(L.T("SHA-256 do resultado inesperado: ", "Unexpected result SHA-256: ") + newSha);
             log.AppendLine();
-            log.AppendLine(string.Format("{0} bytes diferentes; {1} bytes idênticos ao original.", diffs, d.Length - diffs));
+            log.AppendLine(string.Format(L.T("{0} bytes diferentes; {1} bytes idênticos ao original.", "{0} bytes differ; {1} bytes identical to the original."), diffs, d.Length - diffs));
             log.AppendLine(string.Format("Checksum (byte 0x0E): 0x{0:X2} -> 0x{1:X2}", orig[ChecksumOffset], d[ChecksumOffset]));
-            log.AppendLine("SHA-256 do resultado: " + newSha + " (confere)");
+            log.AppendLine(L.T("SHA-256 do resultado: ", "Result SHA-256: ") + newSha + L.T(" (confere)", " (matches)"));
             log.AppendLine();
             foreach (PatchEntry e in Entries) log.AppendLine(string.Format("  0x{0:X5}  {1}", e.Offset, e.Description));
             return d;
