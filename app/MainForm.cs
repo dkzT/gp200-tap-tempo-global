@@ -461,14 +461,14 @@ namespace TapGlobal
         void ShowHelpFlash()
         {
             new InfoDialog(L.T("Como gravar na pedaleira", "How to flash the pedal"), L.T(
-                "1. Faça backup dos seus presets no app GP-200 (Patch List > exportar). A atualização apaga todos os presets do usuário.\n\n" +
+                "1. Faça backup dos seus presets no app GP-200 (Patch List > exportar), por precaução.\n\n" +
                 "2. Conecte a GP-200 ao computador pelo USB e abra o app GP-200.\n\n" +
                 "3. Clique na chave inglesa (Settings) > Firmware Update.\n\n" +
                 "4. Selecione o arquivo gerado (_TAPGLOBAL.bin) e clique em Update Now.\n\n" +
                 "5. Aguarde até o fim. Não desligue a pedaleira nem o cabo durante a atualização.\n\n" +
                 "6. Restaure seus presets pelo app, se necessário.\n\n" +
                 "Dica: para o delay seguir o tempo, deixe o parâmetro Sync ligado no preset.",
-                "1. Back up your presets in the GP-200 app (Patch List > export). Updating erases all user presets.\n\n" +
+                "1. Back up your presets in the GP-200 app (Patch List > export) as a precaution.\n\n" +
                 "2. Connect the GP-200 to the computer via USB and open the GP-200 app.\n\n" +
                 "3. Click the wrench icon (Settings) > Firmware Update.\n\n" +
                 "4. Select the generated file (_TAPGLOBAL.bin) and click Update Now.\n\n" +
