@@ -58,16 +58,30 @@ Também funciona pela linha de comando: `TapGlobalPatcher.exe <oficial.bin> <sai
 
 **Compilar você mesmo** (o compilador C# já vem no Windows, não precisa instalar nada): rode `app\build.bat`. O executável sai em `dist\TapGlobalPatcher.exe`. O código-fonte está em `app/` (`Patcher.cs` = lógica do patch, `MainForm.cs` = interface, `tools/MakeIcon.cs` = gerador do ícone).
 
-### Aviso do Windows/Edge ao baixar e como verificar o .exe
+### Aviso do Windows/Edge ao baixar
 
-Enquanto o executável não for assinado, o SmartScreen do Windows/Edge pode mostrar "não é baixado com frequência" ou "aplicativo desconhecido". Isso é um aviso de **reputação**, não de vírus. Para conferir que o arquivo é legítimo:
+O executável **não é assinado digitalmente**. Por isso o SmartScreen do Windows/Edge pode mostrar "não é baixado com frequência" ou "o Windows protegeu o computador". Esse é um aviso de **reputação** (arquivo novo, de editor desconhecido). Ele não indica vírus.
 
-- O `.exe` das releases é compilado pelo **GitHub Actions** a partir deste código (`.github/workflows/build.yml`), e não num computador pessoal.
-- Cada release traz o `SHA-256` (`SHA256SUMS.txt`). Confira no PowerShell: `Get-FileHash .\TapGlobalPatcher.exe`.
-- Cada build gera um **atestado de origem** do GitHub. Com o GitHub CLI: `gh attestation verify TapGlobalPatcher.exe --repo dkzT/gp200-tap-tempo-global`.
-- O programa não acessa a internet. Ele só lê o firmware escolhido e grava o arquivo novo.
+- **Edge:** na lista de downloads, clique em "..." > **Manter** > **Mostrar mais** > **Manter mesmo assim**.
+- **Windows (ao abrir):** clique em **Mais informações** > **Executar assim mesmo**.
 
-A assinatura de código pela SignPath Foundation (gratuita para projetos open source) foi solicitada. Veja [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
+### Como verificar que o .exe é seguro antes de abrir
+
+Faça um ou mais destes testes. Todos funcionam **sem executar** o programa.
+
+1. **Conferir o hash (SHA-256)** com o publicado na release (`SHA256SUMS.txt` e notas da release). No PowerShell, na pasta do download:
+   ```powershell
+   Get-FileHash .\TapGlobalPatcher.exe
+   ```
+   O valor tem que ser **idêntico** ao publicado. Se mudar um único caractere, o arquivo foi alterado. Não use.
+2. **Conferir que o GitHub compilou o arquivo a partir deste código.** Os `.exe` das releases são gerados pelo GitHub Actions (`.github/workflows/build.yml`), com um **atestado de origem**:
+   - Pelo navegador: aba **Actions** do repositório > execução da versão > o resumo mostra o SHA-256 e o atestado. A lista de atestados fica em https://github.com/dkzT/gp200-tap-tempo-global/attestations
+   - Pelo GitHub CLI: `gh attestation verify TapGlobalPatcher.exe --repo dkzT/gp200-tap-tempo-global` (precisa terminar com "Verification succeeded").
+3. **Antivírus local:** clique com o botão direito no arquivo > **Verificar com o Microsoft Defender** (no Windows 11: "Mostrar mais opções" primeiro).
+4. **VirusTotal (dezenas de antivírus):** em https://www.virustotal.com, aba **Search**, cole o SHA-256 para ver se o arquivo já foi analisado sem precisar enviá-lo. Ou envie o arquivo na aba **File**.
+5. **Compilar você mesmo:** baixe o código (botão **Code** > Download ZIP), leia `app/*.cs` e rode `app\build.bat`. Não precisa instalar nada. O seu `.exe` terá outro hash, porque o compilador grava data e identificadores, mas o comportamento é o mesmo.
+
+O programa **não acessa a internet** e não coleta dados. Ele só lê o firmware escolhido e grava o arquivo novo onde você indicar.
 
 ## Como aplicar: script Python (alternativa)
 
