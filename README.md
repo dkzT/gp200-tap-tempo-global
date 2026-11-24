@@ -4,7 +4,7 @@ Pesquisa de engenharia reversa (análise estática) e um patch de **11 bytes** q
 
 > **Status:** testado em uma GP-200 real com o firmware V1.8.2: o BPM é preservado na troca de preset.
 > **Aviso:** projeto independente, sem vínculo com a Valeton. Modificar firmware pode afetar a garantia. Use por sua conta e risco.
-> Este repositório **não contém** o firmware da Valeton nem binários modificados. O script aplica o patch no arquivo oficial que você baixa do site da Valeton.
+> Este repositório **não contém** o firmware da Valeton nem binários modificados. O aplicativo e o script aplicam o patch no arquivo oficial que você baixa do site da Valeton.
 
 ## O problema
 
@@ -56,7 +56,18 @@ O **TapGlobalPatcher.exe** (Windows, sem instalação) aplica o patch no firmwar
 
 Também funciona pela linha de comando: `TapGlobalPatcher.exe <oficial.bin> <saida.bin>`.
 
-**Compilar você mesmo** (o compilador C# já vem no Windows, não precisa instalar nada): rode `app\build.bat`. O executável sai em `dist\TapGlobalPatcher.exe`. O código-fonte inteiro está em `app/TapGlobalPatcher.cs`.
+**Compilar você mesmo** (o compilador C# já vem no Windows, não precisa instalar nada): rode `app\build.bat`. O executável sai em `dist\TapGlobalPatcher.exe`. O código-fonte está em `app/` (`Patcher.cs` = lógica do patch, `MainForm.cs` = interface, `tools/MakeIcon.cs` = gerador do ícone).
+
+### Aviso do Windows/Edge ao baixar e como verificar o .exe
+
+Enquanto o executável não for assinado, o SmartScreen do Windows/Edge pode mostrar "não é baixado com frequência" ou "aplicativo desconhecido". Isso é um aviso de **reputação**, não de vírus. Para conferir que o arquivo é legítimo:
+
+- O `.exe` das releases é compilado pelo **GitHub Actions** a partir deste código (`.github/workflows/build.yml`), e não num computador pessoal.
+- Cada release traz o `SHA-256` (`SHA256SUMS.txt`). Confira no PowerShell: `Get-FileHash .\TapGlobalPatcher.exe`.
+- Cada build gera um **atestado de origem** do GitHub. Com o GitHub CLI: `gh attestation verify TapGlobalPatcher.exe --repo dkzT/gp200-tap-tempo-global`.
+- O programa não acessa a internet. Ele só lê o firmware escolhido e grava o arquivo novo.
+
+A assinatura de código pela SignPath Foundation (gratuita para projetos open source) foi solicitada. Veja [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
 
 ## Como aplicar: script Python (alternativa)
 
@@ -123,3 +134,7 @@ Para montar o projeto no Ghidra: separe `low_0x0.bin = fw[0x78:0x22309]` e `app_
 | `find_sysex.py`, `pdftext.py` | buscas auxiliares |
 
 Os scripts esperam o firmware em `work/fw.bin` (cópia do original) e rodam a partir da raiz do repositório.
+
+## Licença
+
+Código e documentação sob a licença [MIT](LICENSE). A licença **não** cobre o firmware da Valeton, que não está neste repositório e pertence ao seu dono.
