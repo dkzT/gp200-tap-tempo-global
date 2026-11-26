@@ -1,6 +1,6 @@
 # Tap tempo global para a Valeton GP-200 (firmware V1.8.2)
 
-Pesquisa de engenharia reversa (análise estática) e um patch de **11 bytes** que faz o tap tempo da Valeton GP-200 valer para **todos os presets**. Com o patch, você bate o tempo uma vez e troca de preset sem perder o BPM.
+Pesquisa de engenharia reversa (análise estática) e um patch pequeno (18 bytes, ou 26 com a troca rápida de preset) que faz o tap tempo da Valeton GP-200 valer para **todos os presets**. Com o patch, você bate o tempo uma vez e troca de preset sem perder o BPM.
 
 > **Status:** testado em uma GP-200 real com o firmware V1.8.2: o BPM é preservado na troca de preset.
 > **Aviso:** projeto independente, sem vínculo com a Valeton. Modificar firmware pode afetar a garantia. Use por sua conta e risco.
@@ -8,7 +8,7 @@ Pesquisa de engenharia reversa (análise estática) e um patch de **11 bytes** q
 
 ## English summary
 
-**Global Tap Tempo for the Valeton GP-200 (firmware V1.8.2).** On the stock firmware, the BPM is stored inside each preset, so the tempo you tap is lost whenever you switch presets. This project is the result of static reverse engineering of the firmware. It adds an **11-byte patch** that makes tap tempo **global**: tap once and switch presets freely. The tempo is also kept after a power cycle. Tested on real hardware.
+**Global Tap Tempo for the Valeton GP-200 (firmware V1.8.2).** On the stock firmware, the BPM is stored inside each preset, so the tempo you tap is lost whenever you switch presets. This project is the result of static reverse engineering of the firmware. It adds a small patch (18 bytes, or 26 with the optional fast patch change) that makes tap tempo **global**: tap once and switch presets freely. The tempo is also kept after a power cycle. Tested on real hardware.
 
 - **Download:** `TapGlobalPatcher.exe` from the [Releases](https://github.com/dkzT/gp200-tap-tempo-global/releases) page. It needs no installation, and the interface is available in English and Portuguese.
 - **Use:** download the official GP-200 V1.8.2 firmware from Valeton, drag the `.bin` into the app and click **Generate**. Back up your presets first, then flash the generated file with the official GP-200 app (Settings > Firmware Update).
@@ -44,14 +44,19 @@ Na troca de preset, o firmware original carrega o BPM do preset e, se a flag est
 | 0x00A95E | 0xA8E6 | `d8 b1` `cbz` | `00 bf` `nop` | a troca de preset sempre aplica o global |
 | 0x00A960 | 0xA8E8 | `b4 f8 6c 02` | `b4 f8 22 01` | `ldrh r0,[r4,#0x122]` (lê o global) |
 | 0x00A964 | 0xA8EC | `a4 f8 22 01` | `a4 f8 6c 02` | `strh r0,[r4,#0x26c]` (grava no preset atual) |
+| 0x00A54E | 0xA4D6 | `00 f0 43 f8` `bl` | `00 bf 00 bf` | o tap não chama `set_patch_dirty(1)`: sem asterisco de "editado" (v1.3) |
+| 0x00886E | 0x87F6 | `01 f0 b3 fe` `bl` | `00 bf 00 bf` | idem para o knob de BPM global (v1.3) |
+| 0x5BF5F0 | (dados do DSP) | `17 b7 51 39 17 b7 51 b9` | `0a d7 23 3b 0a d7 23 bb` | **opcional**: troca rápida de preset (ver abaixo) |
 
-Na prática, 11 bytes mudam. Os outros 6.452.717 bytes são idênticos (veja `docs/04-verificacao-diff.txt`).
+Na prática, mudam 18 bytes (26 com a troca rápida de preset), contando o checksum. Todo o resto do arquivo é idêntico ao original.
+
+**Troca rápida de preset (opcional, v1.3):** o passo da rampa de fade-in aplicada pelo DSP depois de trocar de preset vai de ±0,0002 para ±0,0025 por amostra. Ou seja, de 5.000 para 400 amostras, ou **113 ms → 9 ms** a 44,1 kHz. Continua sendo uma rampa, o que evita estalos. O local e o valor foram descobertos pelo projeto [GP-200 Patcher](https://github.com/tntexplosivesltd/gp200-patcher) (tntexplosivesltd); a implementação aqui é independente.
 
 Comportamento resultante:
 - O tempo batido vale para todos os presets e **sobrevive a desligar e ligar** (é o BPM global, salvo na flash).
 - O knob de BPM em Global Settings controla o tempo de todos os presets.
 - O delay só segue o tempo com o parâmetro **Sync ligado** (com Sync desligado, ele usa o tempo fixo em ms).
-- O preset **não** fica marcado como editado (sem asterisco) na troca.
+- O preset **não** fica marcado como editado (sem asterisco), nem na troca nem ao bater o tap (v1.3).
 - Ao salvar um preset, ele grava o BPM global atual.
 
 ## Como aplicar: aplicativo (recomendado)
@@ -63,7 +68,7 @@ O **TapGlobalPatcher.exe** (Windows, sem instalação) aplica o patch no firmwar
 3. Clique em **Gerar firmware com Tap Tempo Global**. O aplicativo:
    - recusa qualquer arquivo que não seja o oficial (confere tamanho, SHA-256, `FRMW` e checksum);
    - aplica o patch, recalcula o checksum e compara o resultado byte a byte com o original;
-   - só salva se o SHA-256 do resultado for exatamente `2c60f211b2ab76d57f385205b5674bd44dac41b133d8550b1a4e8711c882ff8e`;
+   - só salva se o SHA-256 do resultado for exatamente o esperado: `adececced3511ba9866752885c0cfdd49ddbd8af8ff863b8b3e8b9aeb03011b8` (com troca rápida) ou `c90f5ee191237df8645d216f6833435ed7914967142ac2bdcba648a8fcc62793` (sem);
    - nunca sobrescreve o arquivo original.
 4. **Faça backup dos seus presets** pelo app GP-200 (apenas por precaução).
 5. Grave pelo app oficial: Settings > Firmware Update > selecione o `_TAPGLOBAL.bin` > Update Now.
@@ -109,7 +114,7 @@ Pré-requisitos: Python 3 e `pip install capstone` (usado só para mostrar a des
    python scripts/make_patch.py
    ```
    O script recusa um arquivo diferente do esperado, aplica o patch, recalcula o checksum e gera `work/GP-200_V1.8.2_TAPGLOBAL_REVISAO.bin`. Depois ele relê os dois arquivos e lista **cada byte diferente**.
-   SHA-256 esperado do resultado: `2c60f211b2ab76d57f385205b5674bd44dac41b133d8550b1a4e8711c882ff8e`
+   SHA-256 esperado do resultado: `adececced3511ba9866752885c0cfdd49ddbd8af8ff863b8b3e8b9aeb03011b8` (use `--sem-troca-rapida` para a versão sem a troca rápida: `c90f5ee1…2793`)
 4. **Faça backup dos seus presets** pelo app GP-200 (a atualização apaga todos).
 5. Grave pelo app oficial: Settings > Firmware Update > selecione o .bin > Update Now.
 
@@ -136,7 +141,7 @@ Detalhes completos em `docs/`.
 6. **Integridade:** decompilando o `GP-200.exe` (JUCE, 32 bits), o app exige `FRMW`, o modelo (`GP-200`) e uma **soma de 8 bits dos bytes 0x30..fim igual ao byte 0x0E** do cabeçalho. Não há hash nem assinatura.
 7. **Protocolo de atualização:** SysEx MIDI (`F0 7E 48 …`) pela conexão USB. O PC separa o .bin em 4 seções e envia blocos com ACK.
 8. **Recuperação:** a tela "Firmware Update/Restore" não existe no .bin, então é do bootloader. Acesso manual pelos botões (seção acima), testado no aparelho antes de gravar.
-9. **Verificação:** o arquivo gerado foi comparado byte a byte com o original (11 bytes diferentes, todos listados) e depois gravado e testado no aparelho.
+9. **Verificação:** o arquivo gerado foi comparado byte a byte com o original (todos os bytes diferentes listados) e depois gravado e testado no aparelho (v1.0).
 
 ## Ferramentas usadas
 
