@@ -2,7 +2,7 @@
 
 Pesquisa de engenharia reversa (análise estática) e um patch pequeno (18 bytes, ou 26 com a troca rápida de preset) que faz o tap tempo da Valeton GP-200 valer para **todos os presets**. Com o patch, você bate o tempo uma vez e troca de preset sem perder o BPM.
 
-> **Status:** testado em uma GP-200 real com o firmware V1.8.2: o BPM é preservado na troca de preset.
+> **Status:** testado em uma GP-200 real com o firmware V1.8.2: o BPM é preservado na troca de preset (v1.0), e a troca rápida de preset reduz bastante o intervalo entre presets (v1.3).
 > **Aviso:** projeto independente, sem vínculo com a Valeton. Modificar firmware pode afetar a garantia. Use por sua conta e risco.
 > Este repositório **não contém** o firmware da Valeton nem binários modificados. O aplicativo e o script aplicam o patch no arquivo oficial que você baixa do site da Valeton.
 
